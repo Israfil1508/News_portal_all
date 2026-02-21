@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>অ্যাডমিন ড্যাশবোর্ড - নিউজ পোর্টাল</title>
+    <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+    <div class="admin-layout">
+        <!-- Sidebar -->
+        <aside class="admin-sidebar">
+            <div class="logo">📰 নিউজ পোর্টাল</div>
+            <nav class="admin-menu">
+                <a href="dashboard.html" class="active">📊 ড্যাশবোর্ড</a>
+                <a href="articles.html">📝 আর্টিকেল</a>
+                <a href="categories.html">📁 ক্যাটাগরি</a>
+                <a href="users.html" id="usersLink">👥 ইউজার</a>
+                <a href="../index.html">🏠 হোমপেজ</a>
+                <a href="#" onclick="logout()">🚪 লগআউট</a>
+            </nav>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="admin-content">
+            <div class="admin-header">
+                <h1>ড্যাশবোর্ড</h1>
+                <span id="welcomeUser"></span>
+            </div>
+
+            <!-- Stats -->
+            <div class="stats-grid" id="statsGrid">
+                <div class="stat-card">
+                    <h3>মোট আর্টিকেল</h3>
+                    <div class="number" id="totalArticles">-</div>
+                </div>
+                <div class="stat-card">
+                    <h3>মোট ক্যাটাগরি</h3>
+                    <div class="number" id="totalCategories">-</div>
+                </div>
+                <div class="stat-card">
+                    <h3>মোট ইউজার</h3>
+                    <div class="number" id="totalUsers">-</div>
+                </div>
+                <div class="stat-card">
+                    <h3>আজকের ভিউ</h3>
+                    <div class="number" id="todayViews">-</div>
+                </div>
+            </div>
+
+            <!-- Recent Articles -->
+            <div class="table-container">
+                <div class="table-header">
+                    <h3>সর্বশেষ আর্টিকেল</h3>
+                    <a href="article-form.html" class="btn btn-primary">+ নতুন আর্টিকেল</a>
+                </div>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>শিরোনাম</th>
+                            <th>ক্যাটাগরি</th>
+                            <th>লেখক</th>
+                            <th>স্ট্যাটাস</th>
+                            <th>তারিখ</th>
+                        </tr>
+                    </thead>
+                    <tbody id="recentArticles">
+                        <tr><td colspan="5" class="text-center">লোড হচ্ছে...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </main>
+    </div>
+
+    <script src="../js/config.js"></script>
+    <script src="../js/api.js"></script>
+    <script src="../js/auth.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            if (!requireAdmin()) return;
+            
+            const user = getCurrentUser();
+            const fullName = [user.firstName, user.lastName].filter(Boolean).join(' ') || user.username || 'Admin';
+            document.getElementById('welcomeUser').textContent = `স্বাগতম, ${fullName}`;
+            
+            // Hide users link for editors
+            if (user.role === 'editor') {
+                const usersLink = document.getElementById('usersLink');
+                if (usersLink) usersLink.style.display = 'none';
+            }
+            
+            loadDashboardData();
+        });
+
+        async function loadDashboardData() {
+            try {
+                // Load articles
+                const articlesRes = await ArticlesAPI.getAll('?limit=5');
+                const articles = articlesRes.data || articlesRes;
+                document.getElementById('totalArticles').textContent = articlesRes.total || articles.length;
+                
+                // Render recent articles
+                const tbody = document.getElementById('recentArticles');
+                if (articles.length > 0) {
+                    tbody.innerHTML = articles.map(article => `
+                        <tr>
+                            <td><a href="../article.html?id=${article.id}">${truncateText(article.title, 40)}</a></td>
+                            <td>${article.category?.name || '-'}</td>
+                            <td>${article.author?.firstName || '-'}</td>
+                            <td><span class="badge ${article.status === 'published' ? 'badge-success' : 'badge-warning'}">${article.status === 'published' ? 'প্রকাশিত' : 'ড্রাফট'}</span></td>
+                            <td>${formatDate(article.createdAt)}</td>
+                        </tr>
+                    `).join('');
+                } else {
+                    tbody.innerHTML = '<tr><td colspan="5" class="text-center">কোন আর্টিকেল নেই</td></tr>';
+                }
+
+                // Load categories
+                const categoriesRes = await CategoriesAPI.getAll();
+                const categories = categoriesRes.data || categoriesRes;
+                document.getElementById('totalCategories').textContent = categories.length;
+
+                // Load users
+                const usersRes = await UsersAPI.getAll();
+                const users = usersRes.data || usersRes;
+                document.getElementById('totalUsers').textContent = users.length;
+
+                // Today's views (placeholder)
+                document.getElementById('todayViews').textContent = '0';
+
+            } catch (error) {
+                console.error('Error loading dashboard data:', error);
+            }
+        }
+    </script>
+</body>
+</html>

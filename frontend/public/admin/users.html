@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ইউজার ম্যানেজমেন্ট - নিউজ পোর্টাল</title>
+    <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+    <div class="admin-layout">
+        <!-- Sidebar -->
+        <aside class="admin-sidebar">
+            <div class="logo">📰 নিউজ পোর্টাল</div>
+            <nav class="admin-menu">
+                <a href="dashboard.html">📊 ড্যাশবোর্ড</a>
+                <a href="articles.html">📝 আর্টিকেল</a>
+                <a href="categories.html">📁 ক্যাটাগরি</a>
+                <a href="users.html" class="active">👥 ইউজার</a>
+                <a href="../index.html">🏠 হোমপেজ</a>
+                <a href="#" onclick="logout()">🚪 লগআউট</a>
+            </nav>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="admin-content">
+            <div class="admin-header">
+                <h1>ইউজার ম্যানেজমেন্ট</h1>
+            </div>
+
+            <div id="alertContainer"></div>
+
+            <!-- Search -->
+            <div style="display: flex; gap: 15px; margin-bottom: 20px; flex-wrap: wrap;">
+                <input type="text" id="searchInput" class="form-control" placeholder="নাম বা ইমেইল দিয়ে খুঁজুন..." style="max-width: 300px;">
+                <select id="roleFilter" class="form-control" style="max-width: 150px;">
+                    <option value="">সব রোল</option>
+                    <option value="admin">অ্যাডমিন</option>
+                    <option value="user">ইউজার</option>
+                </select>
+                <button class="btn btn-primary" onclick="loadUsers()">খুঁজুন</button>
+            </div>
+
+            <!-- Users Table -->
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>নাম</th>
+                            <th>ইমেইল</th>
+                            <th>রোল</th>
+                            <th>যোগদান</th>
+                            <th>অ্যাকশন</th>
+                        </tr>
+                    </thead>
+                    <tbody id="usersTable">
+                        <tr><td colspan="5" class="text-center">লোড হচ্ছে...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </main>
+    </div>
+
+    <!-- Edit User Modal -->
+    <div class="modal" id="editModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>ইউজার এডিট করুন</h3>
+                <button class="modal-close" onclick="closeEditModal()">&times;</button>
+            </div>
+            <form id="editForm" onsubmit="handleEdit(event)">
+                <div class="form-group">
+                    <label for="editName">নাম</label>
+                    <input type="text" id="editName" class="form-control" required>
+                </div>
+                <div class="form-group">
+                    <label for="editEmail">ইমেইল</label>
+                    <input type="email" id="editEmail" class="form-control" readonly style="background: var(--gray);">
+                </div>
+                <div class="form-group">
+                    <label for="editRole">রোল</label>
+                    <select id="editRole" class="form-control">
+                        <option value="user">ইউজার</option>
+                        <option value="admin">অ্যাডমিন</option>
+                    </select>
+                </div>
+                <div style="text-align: right; margin-top: 20px;">
+                    <button type="button" class="btn btn-secondary" onclick="closeEditModal()">বাতিল</button>
+                    <button type="submit" class="btn btn-primary" id="editSubmitBtn">আপডেট করুন</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Delete Confirmation Modal -->
+    <div class="modal" id="deleteModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>নিশ্চিত করুন</h3>
+                <button class="modal-close" onclick="closeDeleteModal()">&times;</button>
+            </div>
+            <p>আপনি কি নিশ্চিত এই ইউজার মুছে ফেলতে চান?</p>
+            <div style="margin-top: 20px; text-align: right;">
+                <button class="btn btn-secondary" onclick="closeDeleteModal()">বাতিল</button>
+                <button class="btn btn-danger" id="confirmDelete">মুছে ফেলুন</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="../js/config.js"></script>
+    <script src="../js/api.js"></script>
+    <script src="../js/auth.js"></script>
+    <script>
+        let editId = null;
+        let deleteId = null;
+        let allUsers = [];
+
+        document.addEventListener('DOMContentLoaded', () => {
+            // Users page is admin-only (editors should not access)
+            if (!isLoggedIn()) {
+                window.location.href = '../login.html';
+                return;
+            }
+            if (!isAdmin()) {
+                window.location.href = 'dashboard.html';
+                return;
+            }
+            loadUsers();
+        });
+
+        async function loadUsers() {
+            const tbody = document.getElementById('usersTable');
+            const search = document.getElementById('searchInput').value.toLowerCase();
+            const role = document.getElementById('roleFilter').value;
+            
+            tbody.innerHTML = '<tr><td colspan="5" class="text-center">লোড হচ্ছে...</td></tr>';
+            
+            try {
+                const response = await UsersAPI.getAll();
+                allUsers = response.data || response;
+                
+                // Filter users
+                let filteredUsers = allUsers;
+                if (search) {
+                    filteredUsers = filteredUsers.filter(u => 
+                        (u.firstName || '').toLowerCase().includes(search) || 
+                        (u.lastName || '').toLowerCase().includes(search) || 
+                        u.email.toLowerCase().includes(search)
+                    );
+                }
+                if (role) {
+                    filteredUsers = filteredUsers.filter(u => u.role === role);
+                }
+                
+                if (filteredUsers.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="5" class="text-center">কোন ইউজার পাওয়া যায়নি</td></tr>';
+                    return;
+                }
+                
+                const currentUser = getCurrentUser();
+                
+                tbody.innerHTML = filteredUsers.map(user => {
+                    const fullName = [user.firstName, user.lastName].filter(Boolean).join(' ') || user.username;
+                    return `
+                    <tr>
+                        <td>
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <div class="profile-avatar" style="width: 35px; height: 35px; font-size: 14px;">${(user.firstName || user.username || 'U').charAt(0).toUpperCase()}</div>
+                                <strong>${fullName}</strong>
+                            </div>
+                        </td>
+                        <td>${user.email}</td>
+                        <td><span class="badge ${user.role === 'admin' ? 'badge-success' : 'badge-warning'}">${user.role === 'admin' ? 'অ্যাডমিন' : 'ইউজার'}</span></td>
+                        <td>${formatDate(user.createdAt)}</td>
+                        <td class="actions">
+                            <button class="btn btn-sm btn-outline" onclick="openEditModal(${user.id})">✏️ এডিট</button>
+                            ${user.id !== currentUser.id ? `<button class="btn btn-sm btn-danger" onclick="confirmDelete(${user.id})">🗑️ মুছুন</button>` : ''}
+                        </td>
+                    </tr>
+                `}).join('');
+            } catch (error) {
+                tbody.innerHTML = '<tr><td colspan="5" class="text-center">লোড করতে সমস্যা হয়েছে</td></tr>';
+                console.error('Error loading users:', error);
+            }
+        }
+
+        function openEditModal(id) {
+            editId = id;
+            const user = allUsers.find(u => u.id === id);
+            if (user) {
+                const fullName = [user.firstName, user.lastName].filter(Boolean).join(' ') || user.username;
+                document.getElementById('editName').value = fullName;
+                document.getElementById('editEmail').value = user.email;
+                document.getElementById('editRole').value = user.role;
+                document.getElementById('editModal').classList.add('active');
+            }
+        }
+
+        function closeEditModal() {
+            document.getElementById('editModal').classList.remove('active');
+            editId = null;
+        }
+
+        async function handleEdit(event) {
+            event.preventDefault();
+            
+            const submitBtn = document.getElementById('editSubmitBtn');
+            const alertContainer = document.getElementById('alertContainer');
+            
+            const nameInput = document.getElementById('editName').value.trim();
+            const nameParts = nameInput.split(' ');
+            const data = {
+                firstName: nameParts[0] || '',
+                lastName: nameParts.slice(1).join(' ') || '',
+                role: document.getElementById('editRole').value,
+            };
+            
+            submitBtn.textContent = 'অপেক্ষা করুন...';
+            submitBtn.disabled = true;
+            
+            try {
+                await UsersAPI.update(editId, data);
+                alertContainer.innerHTML = '<div class="alert alert-success">ইউজার আপডেট সফল হয়েছে</div>';
+                closeEditModal();
+                loadUsers();
+            } catch (error) {
+                alertContainer.innerHTML = `<div class="alert alert-error">${error.message || 'আপডেট করতে সমস্যা হয়েছে'}</div>`;
+            } finally {
+                submitBtn.textContent = 'আপডেট করুন';
+                submitBtn.disabled = false;
+            }
+        }
+
+        function confirmDelete(id) {
+            deleteId = id;
+            document.getElementById('deleteModal').classList.add('active');
+        }
+
+        function closeDeleteModal() {
+            document.getElementById('deleteModal').classList.remove('active');
+            deleteId = null;
+        }
+
+        document.getElementById('confirmDelete').addEventListener('click', async () => {
+            if (!deleteId) return;
+            
+            try {
+                await UsersAPI.delete(deleteId);
+                closeDeleteModal();
+                document.getElementById('alertContainer').innerHTML = '<div class="alert alert-success">ইউজার মুছে ফেলা হয়েছে</div>';
+                loadUsers();
+            } catch (error) {
+                document.getElementById('alertContainer').innerHTML = `<div class="alert alert-error">${error.message || 'মুছতে সমস্যা হয়েছে'}</div>`;
+            }
+        });
+    </script>
+</body>
+</html>

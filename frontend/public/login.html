@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>লগইন - নিউজ পোর্টাল</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="container nav-container">
+            <a href="index.html" class="logo">📰 নিউজ পোর্টাল</a>
+            <div class="nav-menu">
+                <a href="index.html" class="nav-link">হোম</a>
+                <a href="articles.html" class="nav-link">সব খবর</a>
+            </div>
+            <div class="nav-auth" id="navAuth">
+                <a href="login.html" class="btn btn-outline">লগইন</a>
+                <a href="register.html" class="btn btn-primary">রেজিস্টার</a>
+            </div>
+            <div class="nav-user" id="navUser" style="display: none;">
+                <span id="userName"></span>
+                <a href="profile.html" class="btn btn-outline">প্রোফাইল</a>
+                <button class="btn btn-secondary" onclick="logout()">লগআউট</button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Login Form -->
+    <div class="form-container">
+        <h2>লগইন করুন</h2>
+        <div id="alertContainer"></div>
+        
+        <form id="loginForm" onsubmit="handleLogin(event)">
+            <div class="form-group">
+                <label for="email">ইমেইল</label>
+                <input type="email" id="email" class="form-control" placeholder="আপনার ইমেইল" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="password">পাসওয়ার্ড</label>
+                <input type="password" id="password" class="form-control" placeholder="আপনার পাসওয়ার্ড" required>
+            </div>
+            
+            <button type="submit" class="btn btn-primary btn-lg" style="width: 100%;" id="submitBtn">
+                লগইন
+            </button>
+        </form>
+        
+        <div class="form-footer">
+            <p>একাউন্ট নেই? <a href="register.html">রেজিস্টার করুন</a></p>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-bottom">
+                <p>&copy; 2026 নিউজ পোর্টাল। সর্বস্বত্ব সংরক্ষিত।</p>
+            </div>
+        </div>
+    </footer>
+
+    <script src="js/config.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/auth.js"></script>
+    <script>
+        // Redirect if already logged in
+        if (isLoggedIn()) {
+            window.location.href = 'index.html';
+        }
+
+        async function handleLogin(event) {
+            event.preventDefault();
+            
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            const submitBtn = document.getElementById('submitBtn');
+            const alertContainer = document.getElementById('alertContainer');
+            
+            // Clear previous alerts
+            alertContainer.innerHTML = '';
+            submitBtn.textContent = 'অপেক্ষা করুন...';
+            submitBtn.disabled = true;
+            
+            try {
+                const response = await AuthAPI.login({ email, password });
+                
+                // Save auth data
+                saveAuth(response.token, response.user);
+                
+                // Show success message
+                alertContainer.innerHTML = '<div class="alert alert-success">লগইন সফল হয়েছে! রিডাইরেক্ট হচ্ছে...</div>';
+                
+                // Redirect based on role
+                setTimeout(() => {
+                    if (response.user.role === 'admin' || response.user.role === 'editor') {
+                        window.location.href = 'admin/dashboard.html';
+                    } else {
+                        window.location.href = 'dashboard.html';
+                    }
+                }, 1000);
+            } catch (error) {
+                alertContainer.innerHTML = `<div class="alert alert-error">${error.message || 'লগইন ব্যর্থ হয়েছে'}</div>`;
+                submitBtn.textContent = 'লগইন';
+                submitBtn.disabled = false;
+            }
+        }
+    </script>
+</body>
+</html>

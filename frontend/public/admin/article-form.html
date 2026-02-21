@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>আর্টিকেল ফর্ম - নিউজ পোর্টাল</title>
+    <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+    <div class="admin-layout">
+        <!-- Sidebar -->
+        <aside class="admin-sidebar">
+            <div class="logo">📰 নিউজ পোর্টাল</div>
+            <nav class="admin-menu">
+                <a href="dashboard.html">📊 ড্যাশবোর্ড</a>
+                <a href="articles.html" class="active">📝 আর্টিকেল</a>
+                <a href="categories.html">📁 ক্যাটাগরি</a>
+                <a href="users.html" id="usersLink">👥 ইউজার</a>
+                <a href="../index.html">🏠 হোমপেজ</a>
+                <a href="#" onclick="logout()">🚪 লগআউট</a>
+            </nav>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="admin-content">
+            <div class="admin-header">
+                <h1 id="pageTitle">নতুন আর্টিকেল</h1>
+                <a href="articles.html" class="btn btn-outline">← ফিরে যান</a>
+            </div>
+
+            <div id="alertContainer"></div>
+
+            <div class="table-container" style="padding: 30px;">
+                <form id="articleForm" onsubmit="handleSubmit(event)">
+                    <div class="form-group">
+                        <label for="title">শিরোনাম *</label>
+                        <input type="text" id="title" class="form-control" placeholder="আর্টিকেলের শিরোনাম" required>
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                        <div class="form-group">
+                            <label for="category">ক্যাটাগরি *</label>
+                            <select id="category" class="form-control" required>
+                                <option value="">ক্যাটাগরি নির্বাচন করুন</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="status">স্ট্যাটাস</label>
+                            <select id="status" class="form-control">
+                                <option value="draft">ড্রাফট</option>
+                                <option value="pending">অনুমোদনের জন্য জমা দিন</option>
+                                <!-- Admin-only options added via JS -->
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="image">ছবির URL</label>
+                        <input type="url" id="image" class="form-control" placeholder="https://example.com/image.jpg">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="content">কন্টেন্ট *</label>
+                        <textarea id="content" class="form-control" rows="15" placeholder="আর্টিকেলের বিস্তারিত..." required></textarea>
+                    </div>
+
+                    <div style="display: flex; gap: 15px; margin-top: 20px;">
+                        <button type="submit" class="btn btn-primary btn-lg" id="submitBtn">সেভ করুন</button>
+                        <a href="articles.html" class="btn btn-secondary btn-lg">বাতিল</a>
+                    </div>
+                </form>
+            </div>
+        </main>
+    </div>
+
+    <script src="../js/config.js"></script>
+    <script src="../js/api.js"></script>
+    <script src="../js/auth.js"></script>
+    <script>
+        let editId = null;
+
+        document.addEventListener('DOMContentLoaded', () => {
+            if (!requireAdmin()) return;
+            
+            // Hide users link for editors
+            const user = getCurrentUser();
+            if (user.role === 'editor') {
+                const usersLink = document.getElementById('usersLink');
+                if (usersLink) usersLink.style.display = 'none';
+            }
+            
+            // Add admin-only status options
+            if (user.role === 'admin') {
+                const statusSelect = document.getElementById('status');
+                // Change pending text for admin
+                statusSelect.querySelector('option[value="pending"]').textContent = 'অনুমোদনের অপেক্ষায়';
+                // Add published option
+                const publishedOption = document.createElement('option');
+                publishedOption.value = 'published';
+                publishedOption.textContent = 'প্রকাশিত';
+                statusSelect.appendChild(publishedOption);
+                // Add archived option
+                const archivedOption = document.createElement('option');
+                archivedOption.value = 'archived';
+                archivedOption.textContent = 'আর্কাইভড';
+                statusSelect.appendChild(archivedOption);
+            }
+            
+            loadCategories();
+            
+            // Check if editing
+            const urlParams = new URLSearchParams(window.location.search);
+            editId = urlParams.get('id');
+            
+            if (editId) {
+                document.getElementById('pageTitle').textContent = 'আর্টিকেল এডিট করুন';
+                loadArticle(editId);
+            }
+        });
+
+        async function loadCategories() {
+            try {
+                const response = await CategoriesAPI.getAll();
+                const categories = response.data || response;
+                const select = document.getElementById('category');
+                
+                categories.forEach(cat => {
+                    const option = document.createElement('option');
+                    option.value = cat.id;
+                    option.textContent = cat.name;
+                    select.appendChild(option);
+                });
+            } catch (error) {
+                console.error('Error loading categories:', error);
+            }
+        }
+
+        async function loadArticle(id) {
+            try {
+                const response = await ArticlesAPI.getOne(id);
+                const article = response.data || response;
+                
+                document.getElementById('title').value = article.title;
+                document.getElementById('category').value = article.categoryId;
+                document.getElementById('status').value = article.status;
+                document.getElementById('image').value = article.imageUrl || '';
+                document.getElementById('content').value = article.content;
+            } catch (error) {
+                document.getElementById('alertContainer').innerHTML = '<div class="alert alert-error">আর্টিকেল লোড করতে সমস্যা হয়েছে</div>';
+                console.error('Error loading article:', error);
+            }
+        }
+
+        async function handleSubmit(event) {
+            event.preventDefault();
+            
+            const submitBtn = document.getElementById('submitBtn');
+            const alertContainer = document.getElementById('alertContainer');
+            
+            const data = {
+                title: document.getElementById('title').value,
+                categoryId: parseInt(document.getElementById('category').value),
+                status: document.getElementById('status').value,
+                imageUrl: document.getElementById('image').value || null,
+                content: document.getElementById('content').value,
+            };
+            
+            alertContainer.innerHTML = '';
+            submitBtn.textContent = 'অপেক্ষা করুন...';
+            submitBtn.disabled = true;
+            
+            try {
+                if (editId) {
+                    await ArticlesAPI.update(editId, data);
+                    alertContainer.innerHTML = '<div class="alert alert-success">আর্টিকেল আপডেট সফল হয়েছে</div>';
+                } else {
+                    await ArticlesAPI.create(data);
+                    alertContainer.innerHTML = '<div class="alert alert-success">আর্টিকেল তৈরি সফল হয়েছে</div>';
+                    
+                    // Clear form
+                    document.getElementById('articleForm').reset();
+                }
+            } catch (error) {
+                alertContainer.innerHTML = `<div class="alert alert-error">${error.message || 'সেভ করতে সমস্যা হয়েছে'}</div>`;
+            } finally {
+                submitBtn.textContent = 'সেভ করুন';
+                submitBtn.disabled = false;
+            }
+        }
+    </script>
+</body>
+</html>

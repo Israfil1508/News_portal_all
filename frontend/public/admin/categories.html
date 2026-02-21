@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ক্যাটাগরি ম্যানেজমেন্ট - নিউজ পোর্টাল</title>
+    <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+    <div class="admin-layout">
+        <!-- Sidebar -->
+        <aside class="admin-sidebar">
+            <div class="logo">📰 নিউজ পোর্টাল</div>
+            <nav class="admin-menu">
+                <a href="dashboard.html">📊 ড্যাশবোর্ড</a>
+                <a href="articles.html">📝 আর্টিকেল</a>
+                <a href="categories.html" class="active">📁 ক্যাটাগরি</a>
+                <a href="users.html" id="usersLink">👥 ইউজার</a>
+                <a href="../index.html">🏠 হোমপেজ</a>
+                <a href="#" onclick="logout()">🚪 লগআউট</a>
+            </nav>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="admin-content">
+            <div class="admin-header">
+                <h1>ক্যাটাগরি ম্যানেজমেন্ট</h1>
+                <button class="btn btn-primary" onclick="openModal()">+ নতুন ক্যাটাগরি</button>
+            </div>
+
+            <div id="alertContainer"></div>
+
+            <!-- Categories Table -->
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>নাম</th>
+                            <th>স্লাগ</th>
+                            <th>বিবরণ</th>
+                            <th>আর্টিকেল সংখ্যা</th>
+                            <th>অ্যাকশন</th>
+                        </tr>
+                    </thead>
+                    <tbody id="categoriesTable">
+                        <tr><td colspan="5" class="text-center">লোড হচ্ছে...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </main>
+    </div>
+
+    <!-- Category Modal -->
+    <div class="modal" id="categoryModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modalTitle">নতুন ক্যাটাগরি</h3>
+                <button class="modal-close" onclick="closeModal()">&times;</button>
+            </div>
+            <form id="categoryForm" onsubmit="handleSubmit(event)">
+                <div class="form-group">
+                    <label for="name">নাম *</label>
+                    <input type="text" id="name" class="form-control" placeholder="ক্যাটাগরির নাম" required>
+                </div>
+                <div class="form-group">
+                    <label for="slug">স্লাগ</label>
+                    <input type="text" id="slug" class="form-control" placeholder="category-slug">
+                </div>
+                <div class="form-group">
+                    <label for="description">বিবরণ</label>
+                    <textarea id="description" class="form-control" rows="3" placeholder="ক্যাটাগরির বিবরণ"></textarea>
+                </div>
+                <div style="text-align: right; margin-top: 20px;">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal()">বাতিল</button>
+                    <button type="submit" class="btn btn-primary" id="submitBtn">সেভ করুন</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Delete Confirmation Modal -->
+    <div class="modal" id="deleteModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>নিশ্চিত করুন</h3>
+                <button class="modal-close" onclick="closeDeleteModal()">&times;</button>
+            </div>
+            <p>আপনি কি নিশ্চিত এই ক্যাটাগরি মুছে ফেলতে চান?</p>
+            <div style="margin-top: 20px; text-align: right;">
+                <button class="btn btn-secondary" onclick="closeDeleteModal()">বাতিল</button>
+                <button class="btn btn-danger" id="confirmDelete">মুছে ফেলুন</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="../js/config.js"></script>
+    <script src="../js/api.js"></script>
+    <script src="../js/auth.js"></script>
+    <script>
+        let editId = null;
+        let deleteId = null;
+
+        document.addEventListener('DOMContentLoaded', () => {
+            if (!requireAdmin()) return;
+            
+            // Hide users link for editors
+            const user = getCurrentUser();
+            if (user.role === 'editor') {
+                const usersLink = document.getElementById('usersLink');
+                if (usersLink) usersLink.style.display = 'none';
+            }
+            
+            loadCategories();
+        });
+
+        async function loadCategories() {
+            const tbody = document.getElementById('categoriesTable');
+            
+            try {
+                const response = await CategoriesAPI.getAll();
+                const categories = response.data || response;
+                
+                if (categories.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="5" class="text-center">কোন ক্যাটাগরি নেই</td></tr>';
+                    return;
+                }
+                
+                tbody.innerHTML = categories.map(cat => `
+                    <tr>
+                        <td><strong>${cat.name}</strong></td>
+                        <td>${cat.slug || '-'}</td>
+                        <td>${cat.description || '-'}</td>
+                        <td>${cat.articleCount || 0}</td>
+                        <td class="actions">
+                            <button class="btn btn-sm btn-outline" onclick="editCategory(${cat.id}, '${cat.name}', '${cat.slug || ''}', '${cat.description || ''}')">✏️ এডিট</button>
+                            <button class="btn btn-sm btn-danger" onclick="confirmDelete(${cat.id})">🗑️ মুছুন</button>
+                        </td>
+                    </tr>
+                `).join('');
+            } catch (error) {
+                tbody.innerHTML = '<tr><td colspan="5" class="text-center">লোড করতে সমস্যা হয়েছে</td></tr>';
+                console.error('Error loading categories:', error);
+            }
+        }
+
+        function openModal() {
+            editId = null;
+            document.getElementById('modalTitle').textContent = 'নতুন ক্যাটাগরি';
+            document.getElementById('categoryForm').reset();
+            document.getElementById('categoryModal').classList.add('active');
+        }
+
+        function closeModal() {
+            document.getElementById('categoryModal').classList.remove('active');
+            editId = null;
+        }
+
+        function editCategory(id, name, slug, description) {
+            editId = id;
+            document.getElementById('modalTitle').textContent = 'ক্যাটাগরি এডিট করুন';
+            document.getElementById('name').value = name;
+            document.getElementById('slug').value = slug;
+            document.getElementById('description').value = description;
+            document.getElementById('categoryModal').classList.add('active');
+        }
+
+        async function handleSubmit(event) {
+            event.preventDefault();
+            
+            const submitBtn = document.getElementById('submitBtn');
+            const alertContainer = document.getElementById('alertContainer');
+            
+            const data = {
+                name: document.getElementById('name').value,
+                slug: document.getElementById('slug').value || null,
+                description: document.getElementById('description').value || null,
+            };
+            
+            submitBtn.textContent = 'অপেক্ষা করুন...';
+            submitBtn.disabled = true;
+            
+            try {
+                if (editId) {
+                    await CategoriesAPI.update(editId, data);
+                    alertContainer.innerHTML = '<div class="alert alert-success">ক্যাটাগরি আপডেট সফল হয়েছে</div>';
+                } else {
+                    await CategoriesAPI.create(data);
+                    alertContainer.innerHTML = '<div class="alert alert-success">ক্যাটাগরি তৈরি সফল হয়েছে</div>';
+                }
+                
+                closeModal();
+                loadCategories();
+            } catch (error) {
+                alertContainer.innerHTML = `<div class="alert alert-error">${error.message || 'সেভ করতে সমস্যা হয়েছে'}</div>`;
+            } finally {
+                submitBtn.textContent = 'সেভ করুন';
+                submitBtn.disabled = false;
+            }
+        }
+
+        function confirmDelete(id) {
+            deleteId = id;
+            document.getElementById('deleteModal').classList.add('active');
+        }
+
+        function closeDeleteModal() {
+            document.getElementById('deleteModal').classList.remove('active');
+            deleteId = null;
+        }
+
+        document.getElementById('confirmDelete').addEventListener('click', async () => {
+            if (!deleteId) return;
+            
+            try {
+                await CategoriesAPI.delete(deleteId);
+                closeDeleteModal();
+                document.getElementById('alertContainer').innerHTML = '<div class="alert alert-success">ক্যাটাগরি মুছে ফেলা হয়েছে</div>';
+                loadCategories();
+            } catch (error) {
+                document.getElementById('alertContainer').innerHTML = `<div class="alert alert-error">${error.message || 'মুছতে সমস্যা হয়েছে'}</div>`;
+            }
+        });
+    </script>
+</body>
+</html>

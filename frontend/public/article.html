@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>খবর - নিউজ পোর্টাল</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="container nav-container">
+            <a href="index.html" class="logo">📰 নিউজ পোর্টাল</a>
+            <div class="nav-menu">
+                <a href="index.html" class="nav-link">হোম</a>
+                <a href="articles.html" class="nav-link">সব খবর</a>
+                <div class="dropdown">
+                    <a href="#" class="nav-link dropdown-toggle">ক্যাটাগরি</a>
+                    <div class="dropdown-menu" id="categoryDropdown"></div>
+                </div>
+            </div>
+            <div class="nav-auth" id="navAuth">
+                <a href="login.html" class="btn btn-outline">লগইন</a>
+                <a href="register.html" class="btn btn-primary">রেজিস্টার</a>
+            </div>
+            <div class="nav-user" id="navUser" style="display: none;">
+                <span id="userName"></span>
+                <a href="profile.html" class="btn btn-outline">প্রোফাইল</a>
+                <button class="btn btn-secondary" onclick="logout()">লগআউট</button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Article Content -->
+    <section class="section">
+        <div class="container">
+            <div class="article-detail" id="articleContent">
+                <div class="loading">
+                    <div class="spinner"></div>
+                    লোড হচ্ছে...
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Related Articles -->
+    <section class="section section-gray">
+        <div class="container">
+            <h2 class="section-title">সম্পর্কিত খবর</h2>
+            <div class="articles-grid" id="relatedArticles">
+                <div class="loading">লোড হচ্ছে...</div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-bottom">
+                <p>&copy; 2026 নিউজ পোর্টাল। সর্বস্বত্ব সংরক্ষিত।</p>
+            </div>
+        </div>
+    </footer>
+
+    <script src="js/config.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/auth.js"></script>
+    <script>
+        let currentArticle = null;
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            const articleId = urlParams.get('id');
+            
+            if (articleId) {
+                loadArticle(articleId);
+            } else {
+                document.getElementById('articleContent').innerHTML = '<p class="text-center">খবর পাওয়া যায়নি</p>';
+            }
+        });
+
+        async function loadArticle(id) {
+            const container = document.getElementById('articleContent');
+            
+            try {
+                const article = await ArticlesAPI.getOne(id);
+                currentArticle = article;
+                
+                // Update page title
+                document.title = `${article.title} - নিউজ পোর্টাল`;
+                
+                container.innerHTML = `
+                    <img src="${article.imageUrl || 'https://via.placeholder.com/800x400?text=News'}" alt="${article.title}">
+                    <h1>${article.title}</h1>
+                    <div class="meta">
+                        <span>📁 <a href="category.html?id=${article.categoryId}">${article.category?.name || 'সাধারণ'}</a></span>
+                        <span>✍️ ${article.author?.firstName || 'অজানা'}</span>
+                        <span>📅 ${formatDate(article.createdAt)}</span>
+                        <span>👁️ ${article.viewCount || 0} বার পড়া হয়েছে</span>
+                    </div>
+                    <div class="content">
+                        ${(article.content || '').split('\n').map(p => `<p>${p}</p>`).join('')}
+                    </div>
+                    <div style="margin-top: 30px;">
+                        <a href="articles.html" class="btn btn-outline">← সব খবর দেখুন</a>
+                    </div>
+                `;
+                
+                // Load related articles
+                if (article.categoryId) {
+                    loadRelatedArticles(article.categoryId, article.id);
+                }
+            } catch (error) {
+                container.innerHTML = '<p class="text-center">খবর লোড করতে সমস্যা হয়েছে</p>';
+                console.error('Error loading article:', error);
+            }
+        }
+
+        async function loadRelatedArticles(categoryId, currentId) {
+            const container = document.getElementById('relatedArticles');
+            
+            try {
+                const response = await ArticlesAPI.getByCategory(categoryId);
+                let articles = response.data || response;
+                
+                // Filter out current article
+                articles = articles.filter(a => a.id !== parseInt(currentId)).slice(0, 3);
+                
+                if (articles.length === 0) {
+                    container.innerHTML = '<p class="text-center" style="grid-column: 1/-1;">কোন সম্পর্কিত খবর নেই</p>';
+                    return;
+                }
+                
+                container.innerHTML = articles.map(article => `
+                    <div class="article-card">
+                        <img src="${article.imageUrl || 'https://via.placeholder.com/400x200?text=News'}" alt="${article.title}">
+                        <div class="article-card-body">
+                            <span class="category">${article.category?.name || 'সাধারণ'}</span>
+                            <h3><a href="article.html?id=${article.id}">${article.title}</a></h3>
+                            <div class="meta">
+                                <span>📅 ${formatDate(article.createdAt)}</span>
+                            </div>
+                        </div>
+                    </div>
+                `).join('');
+            } catch (error) {
+                container.innerHTML = '<p class="text-center" style="grid-column: 1/-1;">সম্পর্কিত খবর লোড করতে সমস্যা হয়েছে</p>';
+                console.error('Error loading related articles:', error);
+            }
+        }
+    </script>
+</body>
+</html>

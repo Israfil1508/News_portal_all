@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>আর্টিকেল ম্যানেজমেন্ট - নিউজ পোর্টাল</title>
+    <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+    <div class="admin-layout">
+        <!-- Sidebar -->
+        <aside class="admin-sidebar">
+            <div class="logo">📰 নিউজ পোর্টাল</div>
+            <nav class="admin-menu">
+                <a href="dashboard.html">📊 ড্যাশবোর্ড</a>
+                <a href="articles.html" class="active">📝 আর্টিকেল</a>
+                <a href="categories.html">📁 ক্যাটাগরি</a>
+                <a href="users.html" id="usersLink">👥 ইউজার</a>
+                <a href="../index.html">🏠 হোমপেজ</a>
+                <a href="#" onclick="logout()">🚪 লগআউট</a>
+            </nav>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="admin-content">
+            <div class="admin-header">
+                <h1>আর্টিকেল ম্যানেজমেন্ট</h1>
+                <a href="article-form.html" class="btn btn-primary">+ নতুন আর্টিকেল</a>
+            </div>
+
+            <div id="alertContainer"></div>
+
+            <!-- Search & Filter -->
+            <div style="display: flex; gap: 15px; margin-bottom: 20px; flex-wrap: wrap;">
+                <input type="text" id="searchInput" class="form-control" placeholder="খুঁজুন..." style="max-width: 250px;">
+                <select id="categoryFilter" class="form-control" style="max-width: 180px;">
+                    <option value="">সব ক্যাটাগরি</option>
+                </select>
+                <select id="statusFilter" class="form-control" style="max-width: 150px;">
+                    <option value="">সব স্ট্যাটাস</option>
+                    <option value="published">প্রকাশিত</option>
+                    <option value="pending">অনুমোদনের অপেক্ষায়</option>
+                    <option value="draft">ড্রাফ্ট</option>
+                    <option value="archived">আর্কাইভড</option>
+                </select>
+                <button class="btn btn-primary" onclick="loadArticles()">খুঁজুন</button>
+            </div>
+
+            <!-- Articles Table -->
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>শিরোনাম</th>
+                            <th>ক্যাটাগরি</th>
+                            <th>লেখক</th>
+                            <th>স্ট্যাটাস</th>
+                            <th>তারিখ</th>
+                            <th>অ্যাকশন</th>
+                        </tr>
+                    </thead>
+                    <tbody id="articlesTable">
+                        <tr><td colspan="6" class="text-center">লোড হচ্ছে...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Pagination -->
+            <div class="pagination" id="pagination"></div>
+        </main>
+    </div>
+
+    <!-- Delete Confirmation Modal -->
+    <div class="modal" id="deleteModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>নিশ্চিত করুন</h3>
+                <button class="modal-close" onclick="closeModal()">&times;</button>
+            </div>
+            <p>আপনি কি নিশ্চিত এই আর্টিকেল মুছে ফেলতে চান?</p>
+            <div style="margin-top: 20px; text-align: right;">
+                <button class="btn btn-secondary" onclick="closeModal()">বাতিল</button>
+                <button class="btn btn-danger" id="confirmDelete">মুছে ফেলুন</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="../js/config.js"></script>
+    <script src="../js/api.js"></script>
+    <script src="../js/auth.js"></script>
+    <script>
+        let currentPage = 1;
+        let totalPages = 1;
+        let deleteId = null;
+
+        document.addEventListener('DOMContentLoaded', () => {
+            if (!requireAdmin()) return;
+            
+            // Hide users link for editors
+            const user = getCurrentUser();
+            if (user.role === 'editor') {
+                const usersLink = document.getElementById('usersLink');
+                if (usersLink) usersLink.style.display = 'none';
+            }
+            
+            loadCategoryFilter();
+            loadArticles();
+        });
+
+        async function loadCategoryFilter() {
+            try {
+                const response = await CategoriesAPI.getAll();
+                const categories = response.data || response;
+                const select = document.getElementById('categoryFilter');
+                
+                categories.forEach(cat => {
+                    const option = document.createElement('option');
+                    option.value = cat.id;
+                    option.textContent = cat.name;
+                    select.appendChild(option);
+                });
+            } catch (error) {
+                console.error('Error loading categories:', error);
+            }
+        }
+
+        async function loadArticles(page = 1) {
+            const tbody = document.getElementById('articlesTable');
+            const search = document.getElementById('searchInput').value;
+            const category = document.getElementById('categoryFilter').value;
+            const status = document.getElementById('statusFilter').value;
+            
+            tbody.innerHTML = '<tr><td colspan="6" class="text-center">লোড হচ্ছে...</td></tr>';
+            
+            try {
+                let params = `?page=${page}&limit=10`;
+                if (search) params += `&search=${encodeURIComponent(search)}`;
+                if (category) params += `&category=${category}`;
+                if (status) params += `&status=${status}`;
+                
+                const response = await ArticlesAPI.getAll(params);
+                const articles = response.data || response;
+                totalPages = response.totalPages || 1;
+                currentPage = page;
+                
+                if (articles.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="6" class="text-center">কোন আর্টিকেল পাওয়া যায়নি</td></tr>';
+                    document.getElementById('pagination').innerHTML = '';
+                    return;
+                }
+                
+                const currentUser = getCurrentUser();
+                const isAdminUser = currentUser.role === 'admin';
+                
+                tbody.innerHTML = articles.map(article => {
+                    let statusBadge = '';
+                    switch(article.status) {
+                        case 'published':
+                            statusBadge = '<span class="badge badge-success">প্রকাশিত</span>';
+                            break;
+                        case 'pending':
+                            statusBadge = '<span class="badge badge-warning">অনুমোদনের অপেক্ষায়</span>';
+                            break;
+                        case 'archived':
+                            statusBadge = '<span class="badge badge-secondary">আর্কাইভড</span>';
+                            break;
+                        default:
+                            statusBadge = '<span class="badge badge-secondary">ড্রাফট</span>';
+                    }
+                    
+                    let actions = `<a href="article-form.html?id=${article.id}" class="btn btn-sm btn-outline">✏️ এডিট</a>`;
+                    
+                    // Only admin can approve pending articles
+                    if (isAdminUser && article.status === 'pending') {
+                        actions += ` <button class="btn btn-sm btn-success" onclick="approveArticle(${article.id})">✅ অনুমোদন</button>`;
+                    }
+                    
+                    // Only admin can delete
+                    if (isAdminUser) {
+                        actions += ` <button class="btn btn-sm btn-danger" onclick="confirmDelete(${article.id})">🗑️ মুছুন</button>`;
+                    }
+                    
+                    return `
+                    <tr>
+                        <td><a href="../article.html?id=${article.id}" target="_blank">${truncateText(article.title, 35)}</a></td>
+                        <td>${article.category?.name || '-'}</td>
+                        <td>${article.author?.firstName || '-'}</td>
+                        <td>${statusBadge}</td>
+                        <td>${formatDate(article.createdAt)}</td>
+                        <td class="actions">${actions}</td>
+                    </tr>
+                `}).join('');
+                
+                renderPagination();
+            } catch (error) {
+                tbody.innerHTML = '<tr><td colspan="6" class="text-center">লোড করতে সমস্যা হয়েছে</td></tr>';
+                console.error('Error loading articles:', error);
+            }
+        }
+
+        function renderPagination() {
+            const container = document.getElementById('pagination');
+            
+            if (totalPages <= 1) {
+                container.innerHTML = '';
+                return;
+            }
+            
+            let html = '';
+            
+            if (currentPage > 1) {
+                html += `<a href="#" onclick="loadArticles(${currentPage - 1}); return false;">« আগের</a>`;
+            }
+            
+            for (let i = 1; i <= totalPages; i++) {
+                if (i === currentPage) {
+                    html += `<span class="active">${i}</span>`;
+                } else {
+                    html += `<a href="#" onclick="loadArticles(${i}); return false;">${i}</a>`;
+                }
+            }
+            
+            if (currentPage < totalPages) {
+                html += `<a href="#" onclick="loadArticles(${currentPage + 1}); return false;">পরের »</a>`;
+            }
+            
+            container.innerHTML = html;
+        }
+
+        function confirmDelete(id) {
+            deleteId = id;
+            document.getElementById('deleteModal').classList.add('active');
+        }
+
+        function closeModal() {
+            document.getElementById('deleteModal').classList.remove('active');
+            deleteId = null;
+        }
+
+        document.getElementById('confirmDelete').addEventListener('click', async () => {
+            if (!deleteId) return;
+            
+            try {
+                await ArticlesAPI.delete(deleteId);
+                closeModal();
+                document.getElementById('alertContainer').innerHTML = '<div class="alert alert-success">আর্টিকেল মুছে ফেলা হয়েছে</div>';
+                loadArticles(currentPage);
+            } catch (error) {
+                document.getElementById('alertContainer').innerHTML = `<div class="alert alert-error">${error.message || 'মুছতে সমস্যা হয়েছে'}</div>`;
+            }
+        });        
+        async function approveArticle(id) {
+            try {
+                await ArticlesAPI.update(id, { status: 'published' });
+                document.getElementById('alertContainer').innerHTML = '<div class="alert alert-success">আর্টিকেল অনুমোদন ও প্রকাশ করা হয়েছে</div>';
+                loadArticles(currentPage);
+            } catch (error) {
+                document.getElementById('alertContainer').innerHTML = `<div class="alert alert-error">${error.message || 'অনুমোদন করতে সমস্যা হয়েছে'}</div>`;
+            }
+        }    </script>
+</body>
+</html>

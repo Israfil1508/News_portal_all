@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>রেজিস্টার - নিউজ পোর্টাল</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="container nav-container">
+            <a href="index.html" class="logo">📰 নিউজ পোর্টাল</a>
+            <div class="nav-menu">
+                <a href="index.html" class="nav-link">হোম</a>
+                <a href="articles.html" class="nav-link">সব খবর</a>
+            </div>
+            <div class="nav-auth" id="navAuth">
+                <a href="login.html" class="btn btn-outline">লগইন</a>
+                <a href="register.html" class="btn btn-primary">রেজিস্টার</a>
+            </div>
+            <div class="nav-user" id="navUser" style="display: none;">
+                <span id="userName"></span>
+                <a href="profile.html" class="btn btn-outline">প্রোফাইল</a>
+                <button class="btn btn-secondary" onclick="logout()">লগআউট</button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Register Form -->
+    <div class="form-container">
+        <h2>রেজিস্টার করুন</h2>
+        <div id="alertContainer"></div>
+        
+        <form id="registerForm" onsubmit="handleRegister(event)">
+            <div class="form-group">
+                <label for="username">ইউজারনেম</label>
+                <input type="text" id="username" class="form-control" placeholder="ইউজারনেম (কমপক্ষে ৩ অক্ষর)" required minlength="3">
+            </div>
+            
+            <div class="form-group">
+                <label for="name">নাম</label>
+                <input type="text" id="name" class="form-control" placeholder="আপনার নাম" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="email">ইমেইল</label>
+                <input type="email" id="email" class="form-control" placeholder="আপনার ইমেইল" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="password">পাসওয়ার্ড</label>
+                <input type="password" id="password" class="form-control" placeholder="পাসওয়ার্ড (কমপক্ষে ৬ অক্ষর)" required minlength="6">
+            </div>
+            
+            <div class="form-group">
+                <label for="confirmPassword">পাসওয়ার্ড নিশ্চিত করুন</label>
+                <input type="password" id="confirmPassword" class="form-control" placeholder="পাসওয়ার্ড আবার লিখুন" required>
+            </div>
+            
+            <button type="submit" class="btn btn-primary btn-lg" style="width: 100%;" id="submitBtn">
+                রেজিস্টার
+            </button>
+        </form>
+        
+        <div class="form-footer">
+            <p>ইতিমধ্যে একাউন্ট আছে? <a href="login.html">লগইন করুন</a></p>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-bottom">
+                <p>&copy; 2026 নিউজ পোর্টাল। সর্বস্বত্ব সংরক্ষিত।</p>
+            </div>
+        </div>
+    </footer>
+
+    <script src="js/config.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/auth.js"></script>
+    <script>
+        // Redirect if already logged in
+        if (isLoggedIn()) {
+            window.location.href = 'index.html';
+        }
+
+        async function handleRegister(event) {
+            event.preventDefault();
+            
+            const username = document.getElementById('username').value.trim();
+            const nameInput = document.getElementById('name').value.trim();
+            const nameParts = nameInput.split(' ');
+            const firstName = nameParts[0] || '';
+            const lastName = nameParts.slice(1).join(' ') || '';
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            const confirmPassword = document.getElementById('confirmPassword').value;
+            const submitBtn = document.getElementById('submitBtn');
+            const alertContainer = document.getElementById('alertContainer');
+            
+            // Clear previous alerts
+            alertContainer.innerHTML = '';
+            
+            // Validate passwords match
+            if (password !== confirmPassword) {
+                alertContainer.innerHTML = '<div class="alert alert-error">পাসওয়ার্ড মিলছে না</div>';
+                return;
+            }
+            
+            submitBtn.textContent = 'অপেক্ষা করুন...';
+            submitBtn.disabled = true;
+            
+            try {
+                const response = await AuthAPI.register({ username, firstName, lastName, email, password });
+                
+                // Save auth data
+                saveAuth(response.token, response.user);
+                
+                // Show success message
+                alertContainer.innerHTML = '<div class="alert alert-success">রেজিস্ট্রেশন সফল হয়েছে! রিডাইরেক্ট হচ্ছে...</div>';
+                
+                // Redirect
+                setTimeout(() => {
+                    window.location.href = 'index.html';
+                }, 1000);
+            } catch (error) {
+                alertContainer.innerHTML = `<div class="alert alert-error">${error.message || 'রেজিস্ট্রেশন ব্যর্থ হয়েছে'}</div>`;
+                submitBtn.textContent = 'রেজিস্টার';
+                submitBtn.disabled = false;
+            }
+        }
+    </script>
+</body>
+</html>

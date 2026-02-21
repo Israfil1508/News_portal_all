@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>নিউজ পোর্টাল - হোম</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="container nav-container">
+            <a href="index.html" class="logo">📰 নিউজ পোর্টাল</a>
+            <div class="nav-menu">
+                <a href="index.html" class="nav-link active">হোম</a>
+                <a href="articles.html" class="nav-link">সব খবর</a>
+                <div class="dropdown">
+                    <a href="#" class="nav-link dropdown-toggle">ক্যাটাগরি</a>
+                    <div class="dropdown-menu" id="categoryDropdown">
+                        <!-- Categories loaded via JS -->
+                    </div>
+                </div>
+            </div>
+            <div class="nav-auth" id="navAuth">
+                <a href="login.html" class="btn btn-outline">লগইন</a>
+                <a href="register.html" class="btn btn-primary">রেজিস্টার</a>
+            </div>
+            <div class="nav-user" id="navUser" style="display: none;">
+                <span id="userName"></span>
+                <a href="profile.html" class="btn btn-outline">প্রোফাইল</a>
+                <button class="btn btn-secondary" onclick="logout()">লগআউট</button>
+            </div>
+            <button class="mobile-menu-btn" onclick="toggleMobileMenu()">☰</button>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section class="hero">
+        <div class="container">
+            <h1>স্বাগতম নিউজ পোর্টালে</h1>
+            <p>সর্বশেষ খবর, বিশ্লেষণ এবং আপডেট পান সবার আগে</p>
+        </div>
+    </section>
+
+    <!-- Featured Articles -->
+    <section class="section">
+        <div class="container">
+            <h2 class="section-title">বিশেষ খবর</h2>
+            <div class="featured-grid" id="featuredArticles">
+                <!-- Featured articles loaded via JS -->
+                <div class="loading">লোড হচ্ছে...</div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Latest Articles -->
+    <section class="section section-gray">
+        <div class="container">
+            <h2 class="section-title">সর্বশেষ খবর</h2>
+            <div class="articles-grid" id="latestArticles">
+                <!-- Latest articles loaded via JS -->
+                <div class="loading">লোড হচ্ছে...</div>
+            </div>
+            <div class="text-center mt-4">
+                <a href="articles.html" class="btn btn-primary">সব খবর দেখুন</a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Categories Section -->
+    <section class="section">
+        <div class="container">
+            <h2 class="section-title">ক্যাটাগরি</h2>
+            <div class="categories-grid" id="categoriesGrid">
+                <!-- Categories loaded via JS -->
+                <div class="loading">লোড হচ্ছে...</div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-grid">
+                <div class="footer-col">
+                    <h3>📰 নিউজ পোর্টাল</h3>
+                    <p>বিশ্বস্ত সংবাদ মাধ্যম। সত্য ও নিরপেক্ষ সংবাদ পরিবেশনে প্রতিশ্রুতিবদ্ধ।</p>
+                </div>
+                <div class="footer-col">
+                    <h4>দ্রুত লিংক</h4>
+                    <ul>
+                        <li><a href="index.html">হোম</a></li>
+                        <li><a href="articles.html">সব খবর</a></li>
+                        <li><a href="about.html">আমাদের সম্পর্কে</a></li>
+                        <li><a href="contact.html">যোগাযোগ</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col">
+                    <h4>যোগাযোগ</h4>
+                    <p>ইমেইল: info@newsportal.com</p>
+                    <p>ফোন: +880 1234-567890</p>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>&copy; 2026 নিউজ পোর্টাল। সর্বস্বত্ব সংরক্ষিত।</p>
+            </div>
+        </div>
+    </footer>
+
+    <script src="js/config.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/home.js"></script>
+</body>
+</html>

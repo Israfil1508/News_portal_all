@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>সব খবর - নিউজ পোর্টাল</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="container nav-container">
+            <a href="index.html" class="logo">📰 নিউজ পোর্টাল</a>
+            <div class="nav-menu">
+                <a href="index.html" class="nav-link">হোম</a>
+                <a href="articles.html" class="nav-link active">সব খবর</a>
+                <div class="dropdown">
+                    <a href="#" class="nav-link dropdown-toggle">ক্যাটাগরি</a>
+                    <div class="dropdown-menu" id="categoryDropdown"></div>
+                </div>
+            </div>
+            <div class="nav-auth" id="navAuth">
+                <a href="login.html" class="btn btn-outline">লগইন</a>
+                <a href="register.html" class="btn btn-primary">রেজিস্টার</a>
+            </div>
+            <div class="nav-user" id="navUser" style="display: none;">
+                <span id="userName"></span>
+                <a href="profile.html" class="btn btn-outline">প্রোফাইল</a>
+                <button class="btn btn-secondary" onclick="logout()">লগআউট</button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Page Header -->
+    <section class="hero" style="padding: 40px 0;">
+        <div class="container">
+            <h1>সব খবর</h1>
+            <p>সর্বশেষ সংবাদ ও আপডেট</p>
+        </div>
+    </section>
+
+    <!-- Search & Filter -->
+    <section class="section" style="padding: 20px 0;">
+        <div class="container">
+            <div style="display: flex; gap: 20px; flex-wrap: wrap; align-items: center;">
+                <input type="text" id="searchInput" class="form-control" placeholder="খবর খুঁজুন..." style="max-width: 300px;">
+                <select id="categoryFilter" class="form-control" style="max-width: 200px;">
+                    <option value="">সব ক্যাটাগরি</option>
+                </select>
+                <button class="btn btn-primary" onclick="filterArticles()">খুঁজুন</button>
+            </div>
+        </div>
+    </section>
+
+    <!-- Articles List -->
+    <section class="section section-gray">
+        <div class="container">
+            <div class="articles-grid" id="articlesGrid">
+                <div class="loading">
+                    <div class="spinner"></div>
+                    লোড হচ্ছে...
+                </div>
+            </div>
+            
+            <!-- Pagination -->
+            <div class="pagination" id="pagination"></div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-bottom">
+                <p>&copy; 2026 নিউজ পোর্টাল। সর্বস্বত্ব সংরক্ষিত।</p>
+            </div>
+        </div>
+    </footer>
+
+    <script src="js/config.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/auth.js"></script>
+    <script>
+        let currentPage = 1;
+        let totalPages = 1;
+
+        document.addEventListener('DOMContentLoaded', () => {
+            loadCategoryFilter();
+            loadArticles();
+            
+            // Search on Enter
+            document.getElementById('searchInput').addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') filterArticles();
+            });
+        });
+
+        async function loadCategoryFilter() {
+            try {
+                const response = await CategoriesAPI.getAll();
+                const categories = response.data || response;
+                const select = document.getElementById('categoryFilter');
+                
+                categories.forEach(cat => {
+                    const option = document.createElement('option');
+                    option.value = cat.id;
+                    option.textContent = cat.name;
+                    select.appendChild(option);
+                });
+            } catch (error) {
+                console.error('Error loading categories:', error);
+            }
+        }
+
+        async function loadArticles(page = 1) {
+            const container = document.getElementById('articlesGrid');
+            const search = document.getElementById('searchInput').value;
+            const category = document.getElementById('categoryFilter').value;
+            
+            container.innerHTML = '<div class="loading"><div class="spinner"></div>লোড হচ্ছে...</div>';
+            
+            try {
+                let params = `?page=${page}&limit=9`;
+                if (search) params += `&search=${encodeURIComponent(search)}`;
+                if (category) params += `&categoryId=${category}`;
+                
+                const response = await ArticlesAPI.getAll(params);
+                const articles = response.data || response;
+                totalPages = response.totalPages || 1;
+                currentPage = page;
+                
+                if (articles.length === 0) {
+                    container.innerHTML = '<p class="text-center" style="grid-column: 1/-1;">কোন খবর পাওয়া যায়নি</p>';
+                    document.getElementById('pagination').innerHTML = '';
+                    return;
+                }
+                
+                container.innerHTML = articles.map(article => `
+                    <div class="article-card">
+                        <img src="${article.imageUrl || 'https://via.placeholder.com/400x200?text=News'}" alt="${article.title}">
+                        <div class="article-card-body">
+                            <span class="category">${article.category?.name || 'সাধারণ'}</span>
+                            <h3><a href="article.html?id=${article.id}">${article.title}</a></h3>
+                            <p>${truncateText(article.content || article.summary || '', 100)}</p>
+                            <div class="meta">
+                                <span>✍️ ${article.author?.firstName || 'অজানা'}</span>
+                                <span>📅 ${formatDate(article.createdAt)}</span>
+                            </div>
+                        </div>
+                    </div>
+                `).join('');
+                
+                renderPagination();
+            } catch (error) {
+                container.innerHTML = '<p class="text-center" style="grid-column: 1/-1;">খবর লোড করতে সমস্যা হয়েছে</p>';
+                console.error('Error loading articles:', error);
+            }
+        }
+
+        function filterArticles() {
+            loadArticles(1);
+        }
+
+        function renderPagination() {
+            const container = document.getElementById('pagination');
+            
+            if (totalPages <= 1) {
+                container.innerHTML = '';
+                return;
+            }
+            
+            let html = '';
+            
+            if (currentPage > 1) {
+                html += `<a href="#" onclick="loadArticles(${currentPage - 1}); return false;">« আগের</a>`;
+            }
+            
+            for (let i = 1; i <= totalPages; i++) {
+                if (i === currentPage) {
+                    html += `<span class="active">${i}</span>`;
+                } else {
+                    html += `<a href="#" onclick="loadArticles(${i}); return false;">${i}</a>`;
+                }
+            }
+            
+            if (currentPage < totalPages) {
+                html += `<a href="#" onclick="loadArticles(${currentPage + 1}); return false;">পরের »</a>`;
+            }
+            
+            container.innerHTML = html;
+        }
+    </script>
+</body>
+</html>

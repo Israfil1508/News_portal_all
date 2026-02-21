@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>প্রোফাইল - নিউজ পোর্টাল</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="container nav-container">
+            <a href="index.html" class="logo">📰 নিউজ পোর্টাল</a>
+            <div class="nav-menu">
+                <a href="index.html" class="nav-link">হোম</a>
+                <a href="articles.html" class="nav-link">সব খবর</a>
+            </div>
+            <div class="nav-auth" id="navAuth">
+                <a href="login.html" class="btn btn-outline">লগইন</a>
+                <a href="register.html" class="btn btn-primary">রেজিস্টার</a>
+            </div>
+            <div class="nav-user" id="navUser" style="display: none;">
+                <span id="userName"></span>
+                <a href="profile.html" class="btn btn-outline">প্রোফাইল</a>
+                <button class="btn btn-secondary" onclick="logout()">লগআউট</button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Profile Content -->
+    <section class="section">
+        <div class="profile-container">
+            <div class="profile-card" id="profileCard">
+                <div class="loading">
+                    <div class="spinner"></div>
+                    লোড হচ্ছে...
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-bottom">
+                <p>&copy; 2026 নিউজ পোর্টাল। সর্বস্বত্ব সংরক্ষিত।</p>
+            </div>
+        </div>
+    </footer>
+
+    <script src="js/config.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/auth.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            if (!requireLogin()) return;
+            loadProfile();
+        });
+
+        async function loadProfile() {
+            const container = document.getElementById('profileCard');
+            
+            try {
+                const response = await AuthAPI.getProfile();
+                const user = response.data || response;
+                const fullName = [user.firstName, user.lastName].filter(Boolean).join(' ') || user.username || 'User';
+                
+                container.innerHTML = `
+                    <div class="profile-header">
+                        <div class="profile-avatar">${(user.firstName || user.username || 'U').charAt(0).toUpperCase()}</div>
+                        <div class="profile-info">
+                            <h2>${fullName}</h2>
+                            <span>${user.role === 'admin' ? '👑 অ্যাডমিন' : '👤 সদস্য'}</span>
+                        </div>
+                    </div>
+                    
+                    <div id="alertContainer"></div>
+                    
+                    <form id="profileForm" onsubmit="updateProfile(event)">
+                        <div class="form-group">
+                            <label for="name">নাম</label>
+                            <input type="text" id="name" class="form-control" value="${fullName}" required>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="email">ইমেইল</label>
+                            <input type="email" id="email" class="form-control" value="${user.email}" readonly style="background: var(--gray);">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>একাউন্ট তৈরি হয়েছে</label>
+                            <p>${formatDate(user.createdAt)}</p>
+                        </div>
+                        
+                        <hr style="margin: 20px 0; border: none; border-top: 1px solid var(--gray);">
+                        
+                        <h4 style="margin-bottom: 20px;">পাসওয়ার্ড পরিবর্তন</h4>
+                        
+                        <div class="form-group">
+                            <label for="currentPassword">বর্তমান পাসওয়ার্ড</label>
+                            <input type="password" id="currentPassword" class="form-control" placeholder="বর্তমান পাসওয়ার্ড">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="newPassword">নতুন পাসওয়ার্ড</label>
+                            <input type="password" id="newPassword" class="form-control" placeholder="নতুন পাসওয়ার্ড">
+                        </div>
+                        
+                        <button type="submit" class="btn btn-primary" id="submitBtn">প্রোফাইল আপডেট করুন</button>
+                    </form>
+                `;
+            } catch (error) {
+                container.innerHTML = '<p class="text-center">প্রোফাইল লোড করতে সমস্যা হয়েছে</p>';
+                console.error('Error loading profile:', error);
+            }
+        }
+
+        async function updateProfile(event) {
+            event.preventDefault();
+            
+            const nameInput = document.getElementById('name').value.trim();
+            const nameParts = nameInput.split(' ');
+            const firstName = nameParts[0] || '';
+            const lastName = nameParts.slice(1).join(' ') || '';
+            const currentPassword = document.getElementById('currentPassword').value;
+            const newPassword = document.getElementById('newPassword').value;
+            const submitBtn = document.getElementById('submitBtn');
+            const alertContainer = document.getElementById('alertContainer');
+            
+            alertContainer.innerHTML = '';
+            submitBtn.textContent = 'অপেক্ষা করুন...';
+            submitBtn.disabled = true;
+            
+            try {
+                const data = { firstName, lastName };
+                if (currentPassword && newPassword) {
+                    data.currentPassword = currentPassword;
+                    data.newPassword = newPassword;
+                }
+                
+                const response = await AuthAPI.updateProfile(data);
+                
+                // Update stored user data
+                const user = getCurrentUser();
+                user.firstName = firstName;
+                user.lastName = lastName;
+                localStorage.setItem(USER_KEY, JSON.stringify(user));
+                
+                alertContainer.innerHTML = '<div class="alert alert-success">প্রোফাইল আপডেট সফল হয়েছে</div>';
+                
+                // Clear password fields
+                document.getElementById('currentPassword').value = '';
+                document.getElementById('newPassword').value = '';
+                
+                // Update navigation
+                updateNavigation();
+            } catch (error) {
+                alertContainer.innerHTML = `<div class="alert alert-error">${error.message || 'আপডেট ব্যর্থ হয়েছে'}</div>`;
+            } finally {
+                submitBtn.textContent = 'প্রোফাইল আপডেট করুন';
+                submitBtn.disabled = false;
+            }
+        }
+    </script>
+</body>
+</html>
